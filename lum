@@ -8,7 +8,7 @@ local window = DrRayLibrary:Load("nanitest", "Default")
 local tab1 = DrRayLibrary.newTab("Main", "ImageIdHere")
 tab1.newLabel("Thieu gi thi nhan nhe")
 
-tab1.newButton("predict ball", "Prints Hello!", function()
+tab1.newButton("predict ball", "doan huong ball", function()
     loadstring(game:HttpGet("https://raw.githubusercontent.com/nani201992/h/main/h?token=GHSAT0AAAAAACWNYHEYTPLCSJ3MD2DSK5QWZW75XSQ"))()
 end)
 tab1.newButton("reset la mat", "infinite stamnia", function()
