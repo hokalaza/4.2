@@ -1,4 +1,3 @@
-
 local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
 local window = DrRayLibrary:Load("doi truong source", "Default")
 local tab = DrRayLibrary.newTab("main", "ImageIdHere")
@@ -24,7 +23,10 @@ end)
 tab.newButton("no lfs", "Ko lỗi vạch (br)", function()
 game.workspace.BackrowLF.Size = Vector3.new(0, 01, 01)
 end)
-tab.newToggle("Toggle", "Toggle! (prints the state)", true, function(toggleState)
+tab.newButton("inf yield", "click on", function()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
+end)
+tab.newToggle("vật liệu 2022", "blabla", true, function(toggleState)
     if toggleState then
         game:GetService("MaterialService").Use2022Materials = true   
  else
