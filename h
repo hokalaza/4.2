@@ -1,6 +1,6 @@
 local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
 local window = DrRayLibrary:Load("doi truong source", "Default")
 local tab = DrRayLibrary.newTab("main", "ImageIdHere")
-tab.newInput("check console", "English version", function(text)
+tab.newInput("check console", "input okay its gonna generate an english version", function(text)
     warn("good boy")
 end)
