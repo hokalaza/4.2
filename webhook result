@@ -1,0 +1,79 @@
+local HttpService = game:GetService("HttpService")
+local Webhook_URL = "https://discord.com/api/webhooks/1335925275120111688/hXjFWRi4F3FkHg5RRNXdNQqN8QfMdb0FI5twwcSCklk0DbfFCBOHsPaBRg8yenVbaOcj"
+
+local requestFunction = syn and syn.request or http_request
+if not requestFunction then
+    error("Request function is not supported in this environment!")
+end
+
+-- Hàm để lấy và định dạng dữ liệu điểm số
+local function getScores()
+    local success, result = pcall(function()
+        local scoreboard = game.ReplicatedStorage.GameData.Scoreboard
+        local result = ""
+
+        -- Duyệt qua các giá trị trong bảng điểm
+        for _, team in ipairs(scoreboard:GetChildren()) do
+            if team:IsA("ValueBase") then
+                local teamName = team.Name
+
+                -- Bỏ qua Color1 và Color2
+                if teamName == "Color1" or teamName == "Color2" then
+                    continue
+                end
+
+                -- Đổi tên Set1 và Set2 thành team1Sets và team2Sets
+                if teamName == "Set1" then
+                    teamName = "team1Sets"
+                elseif teamName == "Set2" then
+                    teamName = "team2Sets"
+                elseif teamName == "Score1" then
+                    teamName = "Team1"
+                elseif teamName == "Score2" then
+                    teamName = "Team2"
+                end
+
+                result = result .. teamName .. ": " .. tostring(team.Value) .. "\n"
+            end
+        end
+
+        return result
+    end)
+
+    if not success then
+        return "Error retrieving scores."
+    end
+    return result
+end
+
+-- Vòng lặp while do để gửi dữ liệu mỗi 25 giây
+while true do
+    local scores = getScores()
+
+    -- Lấy tên của local player
+    local playerName = game.Players.LocalPlayer.Name
+
+    -- Gửi dữ liệu đến Discord webhook
+    local response = requestFunction({
+        Url = Webhook_URL,
+        Method = "POST",
+        Headers = {
+            ['Content-Type'] = 'application/json'
+        },
+        Body = HttpService:JSONEncode({
+            ["content"] = "",
+            ["embeds"] = {{
+                ["title"] = "**result has been refreshed**",
+                ["description"] = playerName .. " has executed the script. Scores:\n" .. scores,
+                ["type"] = "rich",
+                ["color"] = tonumber(0xffffff)
+            }}
+        })
+    })
+
+    -- In phản hồi từ Discord (tùy chọn)
+    print("Data sent to Discord. Response:", response.Body)
+
+    -- Chờ 25 giây trước khi lặp lại
+    wait(25)
+end
