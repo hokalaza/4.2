@@ -1,0 +1,299 @@
+local DrRayLibrary = loadstring(game:HttpGet("https://raw.githubusercontent.com/AZYsGithub/DrRay-UI-Library/main/DrRay.lua"))()
+local window       = DrRayLibrary:Load("random free source", "Default")
+local tab          = DrRayLibrary.newTab("main", "ImageIdHere")
+
+local Players    = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInput  = game:GetService("UserInputService")
+local StarterGui = game:GetService("StarterGui")
+local Workspace  = game:GetService("Workspace")
+
+local player = Players.LocalPlayer
+local char   = player.Character or player.CharacterAdded:Wait()
+local camera = workspace.CurrentCamera
+
+player.CharacterAdded:Connect(function(c)
+    char = c
+end)
+
+_G.FollowDistance         = 15
+_G.BumpDistance           = 12
+_G.DiveDistance           = 15
+_G.OnlyBumpWhenAutoFollow = false
+_G.AutoAimMiddleOnFollow  = false
+_G.DesiredWalkSpeed       = 16
+
+local autoFollowEnabled = false
+local followKey         = nil
+local autoDiveEnabled   = false
+local diveKey           = nil
+local speedOverride     = false
+
+local netMiddle = Vector3.new(0,10,0)
+local camLoop
+local function toggleCameraLock(on)
+    if on then
+        camera.CameraType = Enum.CameraType.Scriptable
+        camLoop = RunService.RenderStepped:Connect(function()
+            local root = char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local base = root.Position + Vector3.new(0,2,0)
+                local back = root.CFrame.LookVector * -10 + Vector3.new(0,3,0)
+                camera.CFrame = CFrame.new(base+back, netMiddle)
+            end
+        end)
+    else
+        if camLoop then camLoop:Disconnect() end
+        camera.CameraType = Enum.CameraType.Custom
+    end
+end
+
+local function followClosestMarker()
+    local root = char:FindFirstChild("HumanoidRootPart")
+    local hum  = char:FindFirstChildOfClass("Humanoid")
+    if not (root and hum) then return end
+    local best,bd = nil,math.huge
+    for _,m in ipairs(Workspace:GetChildren()) do
+        if m.Name=="Marker" then
+            local d=(m.Position-root.Position).Magnitude
+            if d<bd then bd,best=d,m end
+        end
+    end
+    if best and bd<=_G.FollowDistance then
+        hum:MoveTo(best.Position)
+    end
+end
+
+local function waitForKeyBind(label, setter)
+    StarterGui:SetCore("SendNotification", {
+        Title    = label,
+        Text     = "Press any key to bind "..label,
+        Duration = 5
+    })
+    local conn
+    conn = UserInput.InputBegan:Connect(function(input,gp)
+        if not gp and input.UserInputType==Enum.UserInputType.Keyboard then
+            setter(input.KeyCode)
+            StarterGui:SetCore("SendNotification", {
+                Title    = label,
+                Text     = "Bound to "..input.KeyCode.Name,
+                Duration = 5
+            })
+            conn:Disconnect()
+        end
+    end)
+end
+
+RunService.RenderStepped:Connect(function()
+    if autoFollowEnabled then followClosestMarker() end
+    if speedOverride then
+        require(char.CharacterScript.CharacterActions).State.WalkSpeed = _G.DesiredWalkSpeed
+    end
+end)
+
+UserInput.InputBegan:Connect(function(input,gp)
+    if gp then return end
+    if input.KeyCode==followKey then
+        if next(markers)==nil then
+            StarterGui:SetCore("SendNotification",{Title="Auto-Follow",Text="You need Predict Ball first",Duration=4})
+            return
+        end
+        autoFollowEnabled = not autoFollowEnabled
+        toggleCameraLock(autoFollowEnabled and _G.AutoAimMiddleOnFollow)
+        StarterGui:SetCore("SendNotification",{Title="Auto-Follow",Text=(autoFollowEnabled and"Enabled"or"Disabled"),Duration=3})
+    elseif input.KeyCode==diveKey then
+        if next(markers)==nil then
+            StarterGui:SetCore("SendNotification",{Title="Auto-Dive",Text="You need Predict Ball first",Duration=4})
+            return
+        end
+        autoDiveEnabled = not autoDiveEnabled
+        StarterGui:SetCore("SendNotification",{Title="Auto-Dive",Text=(autoDiveEnabled and"Enabled"or"Disabled"),Duration=3})
+    end
+end)
+
+tab.newInput("jump height","10 is default jump height",function(txt)
+    local h=char:FindFirstChildOfClass("Humanoid")
+    if h then h.UseJumpPower=false; h.JumpHeight=tonumber(txt) or 10 end
+end)
+
+tab.newInput("auto bump distance","default is 12 (set 0 to disable)",function(txt)
+    _G.BumpDistance=tonumber(txt) or 0
+end)
+
+tab.newInput("auto dive distance","recommended 20 (default is 15)",function(txt)
+    _G.DiveDistance=tonumber(txt) or 0
+end)
+
+tab.newInput("auto follow distance","change auto-follow size (15 default)",function(txt)
+    _G.FollowDistance=tonumber(txt) or 15
+end)
+
+tab.newToggle("auto aim middle when turning on auto follow","LOCK CAMERA TO NET WHEN FOLLOW ON",false,function(st)
+    _G.AutoAimMiddleOnFollow=st
+end)
+
+tab.newToggle("only bump when auto follow","BUMP ONLY WHEN AUTO-FOLLOW ON",false,function(st)
+    _G.OnlyBumpWhenAutoFollow=st
+end)
+
+tab.newButton("inf stamina","",function()
+    require(char.CharacterScript.CharacterActions).State.Stamina=math.huge
+end)
+
+local markers={}
+tab.newButton("predict ball","show landing spot markers",function()
+    repeat task.wait() until Workspace:FindFirstChild("Ball")
+    for _,m in ipairs(Workspace:GetChildren())do
+        if m.Name=="Ball" and not markers[m]then
+            local p=m:WaitForChild("BallPart",10)
+            if p then
+                local mk=Instance.new("Part",Workspace)
+                mk.Name="Marker";mk.Size=Vector3.new(2,2,2);mk.Shape=Enum.PartType.Ball
+                mk.BrickColor=BrickColor.new("White");mk.Material=Enum.Material.Neon
+                mk.CanCollide=false;mk.Anchored=true;mk.Transparency=0.5
+                markers[m]=mk
+            end
+        end
+    end
+    Workspace.ChildAdded:Connect(function(m)
+        if m.Name=="Ball" and not markers[m]then
+            local p=m:WaitForChild("BallPart",10)
+            if p then
+                local mk=Instance.new("Part",Workspace)
+                mk.Name="Marker";mk.Size=Vector3.new(2,2,2);mk.Shape=Enum.PartType.Ball
+                mk.BrickColor=BrickColor.new("White");mk.Material=Enum.Material.Neon
+                mk.CanCollide=false;mk.Anchored=true;mk.Transparency=0.5
+                markers[m]=mk
+            end
+        end
+    end)
+    Workspace.ChildRemoved:Connect(function(m)
+        local mk=markers[m]
+        if mk then mk:Destroy();markers[m]=nil end
+    end)
+    RunService:BindToRenderStep("VizLanding",Enum.RenderPriority.Camera.Value,function()
+        for m,mk in pairs(markers)do
+            local p=m:FindFirstChild("BallPart")
+            if p then
+                local vel=(m:FindFirstChild("Velocity")and m.Velocity.Value)or p.Velocity
+                local a=-workspace.Gravity
+                local t=(-vel.y-math.sqrt(vel.y*vel.y-2*a*p.Position.Y))/a
+                local pos=p.Position+Vector3.new(vel.x,0,vel.z)*t+Vector3.new(0,-p.Position.Y,0)
+                mk.CFrame=CFrame.new(pos)
+            end
+        end
+    end)
+end)
+
+tab.newToggle("PC Auto-Follow","ENABLE AUTO-FOLLOW VIA KEYBIND",false,function(st)
+    autoFollowEnabled=false;followKey=nil;toggleCameraLock(false)
+    if st then waitForKeyBind("Auto-Follow",function(k)followKey=k end) end
+end)
+
+tab.newButton("Mobile Follow Control","spawn draggable follow button",function()
+    if next(markers)==nil then StarterGui:SetCore("SendNotification",{Title="Auto-Follow",Text="You need Predict Ball first",Duration=4})return end
+    if _G.mobileFollowBtn then _G.mobileFollowBtn.Parent:Destroy() end
+    autoFollowEnabled=false;toggleCameraLock(false)
+    local sg=Instance.new("ScreenGui",player:WaitForChild("PlayerGui"))
+    local btn=Instance.new("TextButton",sg)
+    btn.Size=UDim2.new(0,50,0,50);btn.Position=UDim2.new(0,100,0,100)
+    btn.Text="Follow: OFF";btn.BackgroundColor3=Color3.fromRGB(150,0,0)
+    btn.TextColor3=Color3.fromRGB(255,255,255);btn.Draggable=true
+    _G.mobileFollowBtn=btn
+    btn.MouseButton1Click:Connect(function()
+        autoFollowEnabled=not autoFollowEnabled
+        btn.Text=autoFollowEnabled and"Follow: ON"or"Follow: OFF"
+        btn.BackgroundColor3=autoFollowEnabled and Color3.fromRGB(0,150,0)or Color3.fromRGB(150,0,0)
+        toggleCameraLock(autoFollowEnabled and _G.AutoAimMiddleOnFollow)
+    end)
+end)
+
+tab.newToggle("Lock Follow Button","PREVENT/ALLOW DRAGGING ON MOBILE",false,function(st)
+    if _G.mobileFollowBtn then _G.mobileFollowBtn.Draggable=not st end
+end)
+
+tab.newToggle("PC Auto-Dive","ENABLE AUTO-DIVE VIA KEYBIND",false,function(st)
+    autoDiveEnabled=false;diveKey=nil
+    if st then waitForKeyBind("Auto-Dive",function(k)diveKey=k end) end
+end)
+
+tab.newButton("Mobile Dive Control","spawn draggable dive button",function()
+    if next(markers)==nil then StarterGui:SetCore("SendNotification",{Title="Auto-Dive",Text="You need Predict Ball first",Duration=4})return end
+    if _G.mobileDiveBtn then _G.mobileDiveBtn.Parent:Destroy() end
+    autoDiveEnabled=false
+    local sg=Instance.new("ScreenGui",player:WaitForChild("PlayerGui"))
+    local btn=Instance.new("TextButton",sg)
+    btn.Size=UDim2.new(0,50,0,50);btn.Position=UDim2.new(0,160,0,100)
+    btn.Text="Dive: OFF";btn.BackgroundColor3=Color3.fromRGB(150,0,0)
+    btn.TextColor3=Color3.fromRGB(255,255,255);btn.Draggable=true
+    _G.mobileDiveBtn=btn
+    btn.MouseButton1Click:Connect(function()
+        autoDiveEnabled=not autoDiveEnabled
+        btn.Text=autoDiveEnabled and"Dive: ON"or"Dive: OFF"
+        btn.BackgroundColor3=autoDiveEnabled and Color3.fromRGB(0,150,0)or Color3.fromRGB(150,0,0)
+    end)
+end)
+
+tab.newToggle("Lock Dive Button","PREVENT/ALLOW DRAGGING DIVE BUTTON",false,function(st)
+    if _G.mobileDiveBtn then _G.mobileDiveBtn.Draggable=not st end
+end)
+
+tab.newInput("speed","bam vao cai can gat o duoi de doi speed (16 default)",function(txt)
+    _G.DesiredWalkSpeed=tonumber(txt) or 16
+end)
+
+tab.newToggle("Speed Override","TOGGLE CUSTOM WALK SPEED",false,function(st)
+    speedOverride=st
+    if not st then require(char.CharacterScript.CharacterActions).State.WalkSpeed=16 end
+end)
+
+tab.newButton("no lfs","servings",function()workspace.ServeLF.Size=Vector3.new(0,1,1)end)
+tab.newButton("no lfs","backrow",function()workspace.BackrowLF.Size=Vector3.new(0,1,1)end)
+tab.newButton("infinite yield","",function()loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()end)
+
+local ballData={}
+Workspace.ChildAdded:Connect(function(m)
+    if m.Name=="Ball" then
+        local p=m:WaitForChild("BallPart",10)
+        if p then ballData[p]={lastBump=0,lastDive=0,dived=false} end
+    end
+end)
+Workspace.ChildRemoved:Connect(function(m)
+    local p=m:FindFirstChild("BallPart")
+    if p then ballData[p]=nil end
+end)
+
+RunService.RenderStepped:Connect(function()
+    local root=char:FindFirstChild("HumanoidRootPart")
+    local now=os.clock()
+    if not root then return end
+    for part,data in pairs(ballData) do
+        if part.Parent then
+            if autoDiveEnabled then
+                local predD=part.Position+part.Velocity*0.15
+                local dD=(predD-root.Position).Magnitude
+                if dD<=_G.DiveDistance and not data.dived then
+                    data.dived=true
+                    local mk=markers[part.Parent]
+                    if mk then
+                        root.CFrame=CFrame.new(root.Position,Vector3.new(mk.Position.X,root.Position.Y,mk.Position.Z))
+                        camera.CFrame=CFrame.new(camera.CFrame.Position,mk.Position)
+                        require(char.CharacterScript.CharacterActions):Dive()
+                    end
+                elseif dD>_G.DiveDistance then
+                    data.dived=false
+                end
+            end
+            if _G.BumpDistance>0 then
+                if not(_G.OnlyBumpWhenAutoFollow and not autoFollowEnabled) then
+                    local predB=part.Position+part.Velocity*0.1
+                    local dB=(predB-root.Position).Magnitude
+                    if dB<=_G.BumpDistance and now-data.lastBump>=0.3 then
+                        data.lastBump=now
+                        require(char.CharacterScript.CharacterActions):Bump()
+                    end
+                end
+            end
+        end
+    end
+end)
