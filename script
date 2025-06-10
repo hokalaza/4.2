@@ -1,0 +1,1 @@
+loadstring(game:HttpGet("https://raw.githubusercontent.com/hokalaza/4.2/refs/heads/main/english"))()
